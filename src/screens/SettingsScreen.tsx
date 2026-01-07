@@ -146,50 +146,54 @@ function VolumeSlider({
   const thumbSize = 28;
   const trackHeight = 6;
 
-  const [sliderPosition, setSliderPosition] = React.useState(
+  // Use ref to track current position for gesture handling
+  const currentPosition = React.useRef(value * sliderWidth);
+  const startPosition = React.useRef(0);
+  const [displayPosition, setDisplayPosition] = React.useState(
     value * sliderWidth
   );
-  const panX = React.useRef(new Animated.Value(value * sliderWidth)).current;
 
+  // Sync with external value changes
   React.useEffect(() => {
-    panX.setValue(value * sliderWidth);
-    setSliderPosition(value * sliderWidth);
+    const newPos = value * sliderWidth;
+    currentPosition.current = newPos;
+    setDisplayPosition(newPos);
   }, [value]);
 
-  const panResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (_, gestureState) => {
-        panX.setOffset(sliderPosition);
-        panX.setValue(0);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const newValue = Math.max(
-          0,
-          Math.min(sliderWidth, sliderPosition + gestureState.dx)
-        );
-        panX.setOffset(0);
-        panX.setValue(newValue);
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        panX.flattenOffset();
-        const newPosition = Math.max(
-          0,
-          Math.min(sliderWidth, sliderPosition + gestureState.dx)
-        );
-        setSliderPosition(newPosition);
-        onValueChange(Math.round((newPosition / sliderWidth) * 100) / 100);
-      },
-    })
-  ).current;
+  const panResponder = React.useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          // Store the starting position when gesture begins
+          startPosition.current = currentPosition.current;
+        },
+        onPanResponderMove: (_, gestureState) => {
+          // Calculate new position based on drag
+          const newPos = Math.max(
+            0,
+            Math.min(sliderWidth, startPosition.current + gestureState.dx)
+          );
+          currentPosition.current = newPos;
+          setDisplayPosition(newPos);
+          // Update value in real-time while dragging
+          const newValue = Math.round((newPos / sliderWidth) * 100) / 100;
+          onValueChange(newValue);
+        },
+        onPanResponderRelease: () => {
+          // Final value is already set during move
+        },
+      }),
+    [onValueChange, sliderWidth]
+  );
 
   const handleTrackPress = (event: any) => {
     const { locationX } = event.nativeEvent;
-    const newPosition = Math.max(0, Math.min(sliderWidth, locationX));
-    setSliderPosition(newPosition);
-    panX.setValue(newPosition);
-    onValueChange(Math.round((newPosition / sliderWidth) * 100) / 100);
+    const newPos = Math.max(0, Math.min(sliderWidth, locationX));
+    currentPosition.current = newPos;
+    setDisplayPosition(newPos);
+    onValueChange(Math.round((newPos / sliderWidth) * 100) / 100);
   };
 
   return (
@@ -206,18 +210,18 @@ function VolumeSlider({
           },
         ]}
       >
-        <Animated.View
+        <View
           style={[
             styles.sliderFill,
             {
-              width: panX,
+              width: displayPosition,
               height: trackHeight,
               backgroundColor: colors.text,
             },
           ]}
         />
       </TouchableOpacity>
-      <Animated.View
+      <View
         {...panResponder.panHandlers}
         style={[
           styles.sliderThumb,
@@ -226,11 +230,7 @@ function VolumeSlider({
             height: thumbSize,
             backgroundColor: colors.background,
             borderColor: colors.text,
-            transform: [
-              {
-                translateX: Animated.subtract(panX, thumbSize / 2),
-              },
-            ],
+            left: displayPosition - thumbSize / 2,
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.25,
@@ -813,9 +813,10 @@ const styles = StyleSheet.create({
     ...typography.callout,
   },
   sliderContainer: {
-    height: 28,
+    height: 40,
     justifyContent: "center",
     alignItems: "flex-start",
+    position: "relative",
   },
   sliderTrack: {
     borderRadius: 3,
@@ -828,6 +829,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     borderRadius: 14,
     borderWidth: 1,
+    top: 6,
   },
   dataRow: {
     flexDirection: "row",
