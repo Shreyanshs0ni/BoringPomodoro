@@ -1,25 +1,31 @@
 import { Audio, AVPlaybackStatus } from "expo-av";
 
-export type AmbientSoundType = "none" | "rain" | "forest" | "cafe" | "ocean" | "fireplace";
+export type AmbientSoundType =
+  | "none"
+  | "rain"
+  | "forest"
+  | "cafe"
+  | "ocean"
+  | "fireplace";
 export type AlarmSoundType = "bell" | "chime" | "digital" | "gentle" | "none";
 
-// Ambient sound URLs
-const AMBIENT_SOUNDS: Record<AmbientSoundType, string | null> = {
+// Local ambient sound files
+const AMBIENT_SOUNDS: Record<AmbientSoundType, any> = {
   none: null,
-  rain: "https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3",
-  forest: "https://assets.mixkit.co/active_storage/sfx/1164/1164-preview.mp3",
-  cafe: "https://assets.mixkit.co/active_storage/sfx/2174/2174-preview.mp3",
-  ocean: "https://assets.mixkit.co/active_storage/sfx/2195/2195-preview.mp3",
-  fireplace: "https://assets.mixkit.co/active_storage/sfx/2177/2177-preview.mp3",
+  rain: require("../../assets/sounds/gentle-rain-07-437321.mp3"),
+  forest: require("../../assets/sounds/forest-daytime-446356.mp3"),
+  cafe: require("../../assets/sounds/people-talking-at-cafe-ambience-6159.mp3"),
+  ocean: require("../../assets/sounds/ocean-waves-250310.mp3"),
+  fireplace: require("../../assets/sounds/fireplace-6354.mp3"),
 };
 
-// Alarm sound URLs
-const ALARM_SOUNDS: Record<AlarmSoundType, string | null> = {
+// Local alarm sound files
+const ALARM_SOUNDS: Record<AlarmSoundType, any> = {
   none: null,
-  bell: "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
-  chime: "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3",
-  digital: "https://assets.mixkit.co/active_storage/sfx/2867/2867-preview.mp3",
-  gentle: "https://assets.mixkit.co/active_storage/sfx/2868/2868-preview.mp3",
+  bell: require("../../assets/sounds/bell.mp3"),
+  chime: require("../../assets/sounds/chime.mp3"),
+  digital: require("../../assets/sounds/digitsl.mp3"),
+  gentle: require("../../assets/sounds/gentle.mp3"),
 };
 
 class AudioService {
@@ -42,9 +48,12 @@ class AudioService {
   }
 
   // Ambient Sound Methods
-  async playAmbientSound(type: AmbientSoundType, volume: number = 0.5): Promise<boolean> {
-    const soundUrl = AMBIENT_SOUNDS[type];
-    if (!soundUrl || type === "none") {
+  async playAmbientSound(
+    type: AmbientSoundType,
+    volume: number = 0.5
+  ): Promise<boolean> {
+    const soundSource = AMBIENT_SOUNDS[type];
+    if (!soundSource || type === "none") {
       await this.stopAmbientSound();
       return false;
     }
@@ -53,14 +62,11 @@ class AudioService {
       // Stop existing sound first
       await this.stopAmbientSound();
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUrl },
-        {
-          isLooping: true,
-          volume: volume,
-          shouldPlay: true,
-        }
-      );
+      const { sound } = await Audio.Sound.createAsync(soundSource, {
+        isLooping: true,
+        volume: volume,
+        shouldPlay: true,
+      });
 
       this.ambientSound = sound;
       this.isAmbientPlaying = true;
@@ -139,8 +145,8 @@ class AudioService {
 
   // Alarm Sound Methods
   async playAlarmSound(type: AlarmSoundType): Promise<void> {
-    const soundUrl = ALARM_SOUNDS[type];
-    if (!soundUrl || type === "none") return;
+    const soundSource = ALARM_SOUNDS[type];
+    if (!soundSource || type === "none") return;
 
     try {
       // Unload previous alarm if any
@@ -148,10 +154,10 @@ class AudioService {
         await this.alarmSound.unloadAsync();
       }
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUrl },
-        { shouldPlay: true, volume: 1.0 }
-      );
+      const { sound } = await Audio.Sound.createAsync(soundSource, {
+        shouldPlay: true,
+        volume: 1.0,
+      });
 
       this.alarmSound = sound;
 
@@ -167,32 +173,46 @@ class AudioService {
     }
   }
 
-  async previewSound(type: AmbientSoundType | AlarmSoundType, isAmbient: boolean): Promise<Audio.Sound | null> {
-    const soundUrl = isAmbient 
-      ? AMBIENT_SOUNDS[type as AmbientSoundType] 
-      : ALARM_SOUNDS[type as AlarmSoundType];
-    
-    if (!soundUrl) return null;
+  async previewAmbientSound(
+    type: AmbientSoundType
+  ): Promise<Audio.Sound | null> {
+    const soundSource = AMBIENT_SOUNDS[type];
+    if (!soundSource || type === "none") return null;
 
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUrl },
-        { shouldPlay: true, volume: isAmbient ? this.ambientVolume : 1.0 }
-      );
-
-      // Auto-unload after 5 seconds for preview
-      setTimeout(async () => {
-        try {
-          await sound.stopAsync();
-          await sound.unloadAsync();
-        } catch (e) {
-          // Sound may already be unloaded
-        }
-      }, 5000);
+      const { sound } = await Audio.Sound.createAsync(soundSource, {
+        shouldPlay: true,
+        volume: this.ambientVolume,
+        isLooping: true,
+      });
 
       return sound;
     } catch (error) {
-      console.error("Error previewing sound:", error);
+      console.error("Error previewing ambient sound:", error);
+      return null;
+    }
+  }
+
+  async previewAlarmSound(type: AlarmSoundType): Promise<Audio.Sound | null> {
+    const soundSource = ALARM_SOUNDS[type];
+    if (!soundSource || type === "none") return null;
+
+    try {
+      const { sound } = await Audio.Sound.createAsync(soundSource, {
+        shouldPlay: true,
+        volume: 1.0,
+      });
+
+      // Auto-unload after playing
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+
+      return sound;
+    } catch (error) {
+      console.error("Error previewing alarm sound:", error);
       return null;
     }
   }
@@ -212,4 +232,3 @@ class AudioService {
 }
 
 export const audioService = new AudioService();
-

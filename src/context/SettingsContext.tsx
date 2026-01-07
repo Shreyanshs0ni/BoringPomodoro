@@ -74,23 +74,23 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 const SETTINGS_STORAGE_KEY = "@pomodoro_settings";
 
-// Ambient sound URLs (using free ambient sounds)
-const AMBIENT_SOUNDS: Record<AmbientSound, string | null> = {
+// Local ambient sound files
+const AMBIENT_SOUNDS: Record<AmbientSound, any> = {
   none: null,
-  rain: "https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3",
-  forest: "https://assets.mixkit.co/active_storage/sfx/1164/1164-preview.mp3",
-  cafe: "https://assets.mixkit.co/active_storage/sfx/2174/2174-preview.mp3",
-  ocean: "https://assets.mixkit.co/active_storage/sfx/2195/2195-preview.mp3",
-  fireplace: "https://assets.mixkit.co/active_storage/sfx/2177/2177-preview.mp3",
+  rain: require("../../assets/sounds/gentle-rain-07-437321.mp3"),
+  forest: require("../../assets/sounds/forest-daytime-446356.mp3"),
+  cafe: require("../../assets/sounds/people-talking-at-cafe-ambience-6159.mp3"),
+  ocean: require("../../assets/sounds/ocean-waves-250310.mp3"),
+  fireplace: require("../../assets/sounds/fireplace-6354.mp3"),
 };
 
-// Alarm sound URLs
-const ALARM_SOUNDS: Record<AlarmSound, string | null> = {
+// Local alarm sound files
+const ALARM_SOUNDS: Record<AlarmSound, any> = {
   none: null,
-  bell: "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
-  chime: "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3",
-  digital: "https://assets.mixkit.co/active_storage/sfx/2867/2867-preview.mp3",
-  gentle: "https://assets.mixkit.co/active_storage/sfx/2868/2868-preview.mp3",
+  bell: require("../../assets/sounds/bell.mp3"),
+  chime: require("../../assets/sounds/chime.mp3"),
+  digital: require("../../assets/sounds/digitsl.mp3"),
+  gentle: require("../../assets/sounds/gentle.mp3"),
 };
 
 interface SettingsProviderProps {
@@ -195,8 +195,8 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   }, []);
 
   const playAmbientSound = useCallback(async () => {
-    const soundUrl = AMBIENT_SOUNDS[settings.ambientSound];
-    if (!soundUrl) return;
+    const soundSource = AMBIENT_SOUNDS[settings.ambientSound];
+    if (!soundSource) return;
 
     try {
       // Stop existing sound first
@@ -205,7 +205,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       }
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUrl },
+        soundSource,
         { 
           isLooping: true, 
           volume: settings.ambientVolume,
@@ -230,12 +230,12 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   }, [ambientSoundObj]);
 
   const previewAlarmSound = useCallback(async () => {
-    const soundUrl = ALARM_SOUNDS[settings.alarmSound];
-    if (!soundUrl) return;
+    const soundSource = ALARM_SOUNDS[settings.alarmSound];
+    if (!soundSource) return;
 
     try {
       const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUrl },
+        soundSource,
         { shouldPlay: true }
       );
       
