@@ -10,6 +10,7 @@ import {
   PanResponder,
   Alert,
 } from "react-native";
+import { Audio } from "expo-av";
 import Svg, { Path, Rect } from "react-native-svg";
 import {
   useSettings,
@@ -260,6 +261,24 @@ const AMBIENT_SOUNDS: { value: AmbientSound; label: string }[] = [
   { value: "fireplace", label: "Fireplace" },
 ];
 
+// Local sound sources for preview
+const AMBIENT_SOUND_SOURCES: Record<AmbientSound, any> = {
+  none: null,
+  rain: require("../../assets/sounds/gentle-rain-07-437321.mp3"),
+  forest: require("../../assets/sounds/forest-daytime-446356.mp3"),
+  cafe: require("../../assets/sounds/people-talking-at-cafe-ambience-6159.mp3"),
+  ocean: require("../../assets/sounds/ocean-waves-250310.mp3"),
+  fireplace: require("../../assets/sounds/fireplace-6354.mp3"),
+};
+
+const ALARM_SOUND_SOURCES: Record<AlarmSound, any> = {
+  none: null,
+  bell: require("../../assets/sounds/bell.mp3"),
+  chime: require("../../assets/sounds/chime.mp3"),
+  digital: require("../../assets/sounds/digitsl.mp3"),
+  gentle: require("../../assets/sounds/gentle.mp3"),
+};
+
 export function SettingsScreen() {
   const {
     settings,
@@ -270,19 +289,110 @@ export function SettingsScreen() {
     setAmbientSound,
     setAmbientVolume,
     toggleTheme,
-    playAmbientSound,
     stopAmbientSound,
-    previewAlarmSound,
     isAmbientPlaying,
   } = useSettings();
 
   const { clearAllData, sessions } = useInsights();
 
-  const handleAmbientPreview = async () => {
-    if (isAmbientPlaying) {
-      await stopAmbientSound();
-    } else {
-      await playAmbientSound();
+  // Track preview sounds separately
+  const [previewingAmbient, setPreviewingAmbient] =
+    React.useState<AmbientSound | null>(null);
+  const [ambientPreviewSound, setAmbientPreviewSound] =
+    React.useState<Audio.Sound | null>(null);
+  const [alarmPreviewSound, setAlarmPreviewSound] =
+    React.useState<Audio.Sound | null>(null);
+
+  // Cleanup preview sounds on unmount
+  React.useEffect(() => {
+    return () => {
+      if (ambientPreviewSound) {
+        ambientPreviewSound.unloadAsync();
+      }
+      if (alarmPreviewSound) {
+        alarmPreviewSound.unloadAsync();
+      }
+    };
+  }, []);
+
+  // Preview a specific alarm sound
+  const handlePreviewAlarm = async (soundType: AlarmSound) => {
+    const soundSource = ALARM_SOUND_SOURCES[soundType];
+    if (!soundSource) return;
+
+    try {
+      // Stop any existing preview
+      if (alarmPreviewSound) {
+        await alarmPreviewSound.stopAsync();
+        await alarmPreviewSound.unloadAsync();
+      }
+
+      const { sound } = await Audio.Sound.createAsync(soundSource, {
+        shouldPlay: true,
+        volume: 1.0,
+      });
+
+      setAlarmPreviewSound(sound);
+
+      // Auto-unload after playing
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+          setAlarmPreviewSound(null);
+        }
+      });
+    } catch (error) {
+      console.error("Error previewing alarm:", error);
+    }
+  };
+
+  // Preview a specific ambient sound
+  const handlePreviewAmbient = async (soundType: AmbientSound) => {
+    const soundSource = AMBIENT_SOUND_SOURCES[soundType];
+
+    // If already previewing this sound, stop it
+    if (previewingAmbient === soundType && ambientPreviewSound) {
+      await ambientPreviewSound.stopAsync();
+      await ambientPreviewSound.unloadAsync();
+      setAmbientPreviewSound(null);
+      setPreviewingAmbient(null);
+      return;
+    }
+
+    if (!soundSource) return;
+
+    try {
+      // Stop any existing preview
+      if (ambientPreviewSound) {
+        await ambientPreviewSound.stopAsync();
+        await ambientPreviewSound.unloadAsync();
+      }
+
+      // Also stop the main ambient sound if playing
+      if (isAmbientPlaying) {
+        await stopAmbientSound();
+      }
+
+      const { sound } = await Audio.Sound.createAsync(soundSource, {
+        shouldPlay: true,
+        volume: settings.ambientVolume,
+        isLooping: true,
+      });
+
+      setAmbientPreviewSound(sound);
+      setPreviewingAmbient(soundType);
+    } catch (error) {
+      console.error("Error previewing ambient:", error);
+    }
+  };
+
+  // Stop ambient preview
+  const stopAmbientPreview = async () => {
+    if (ambientPreviewSound) {
+      await ambientPreviewSound.stopAsync();
+      await ambientPreviewSound.unloadAsync();
+      setAmbientPreviewSound(null);
+      setPreviewingAmbient(null);
     }
   };
 
@@ -444,7 +554,7 @@ export function SettingsScreen() {
                         styles.playButton,
                         { backgroundColor: colors.surface },
                       ]}
-                      onPress={previewAlarmSound}
+                      onPress={() => handlePreviewAlarm(sound.value)}
                     >
                       <PlayIcon color={colors.textSecondary} />
                     </TouchableOpacity>
@@ -467,63 +577,65 @@ export function SettingsScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {AMBIENT_SOUNDS.map((sound, index) => (
-            <React.Fragment key={sound.value}>
-              {index > 0 && (
-                <View
-                  style={[styles.divider, { backgroundColor: colors.border }]}
-                />
-              )}
-              <TouchableOpacity
-                style={styles.soundRow}
-                onPress={() => {
-                  setAmbientSound(sound.value);
-                  if (isAmbientPlaying) stopAmbientSound();
-                }}
-              >
-                <Text
-                  style={[
-                    styles.soundLabel,
-                    {
-                      color:
-                        settings.ambientSound === sound.value
-                          ? colors.text
-                          : colors.textSecondary,
-                    },
-                  ]}
+          {AMBIENT_SOUNDS.map((sound, index) => {
+            const isThisSoundPreviewing = previewingAmbient === sound.value;
+            return (
+              <React.Fragment key={sound.value}>
+                {index > 0 && (
+                  <View
+                    style={[styles.divider, { backgroundColor: colors.border }]}
+                  />
+                )}
+                <TouchableOpacity
+                  style={styles.soundRow}
+                  onPress={async () => {
+                    // Stop any preview when selecting
+                    await stopAmbientPreview();
+                    setAmbientSound(sound.value);
+                    if (isAmbientPlaying) stopAmbientSound();
+                  }}
                 >
-                  {sound.label}
-                </Text>
-                <View style={styles.soundActions}>
-                  {settings.ambientSound === sound.value && (
-                    <CheckIcon color={colors.text} />
-                  )}
-                  {sound.value !== "none" && (
-                    <TouchableOpacity
-                      style={[
-                        styles.playButton,
-                        {
-                          backgroundColor:
-                            isAmbientPlaying &&
-                            settings.ambientSound === sound.value
+                  <Text
+                    style={[
+                      styles.soundLabel,
+                      {
+                        color:
+                          settings.ambientSound === sound.value
+                            ? colors.text
+                            : colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {sound.label}
+                  </Text>
+                  <View style={styles.soundActions}>
+                    {settings.ambientSound === sound.value && (
+                      <CheckIcon color={colors.text} />
+                    )}
+                    {sound.value !== "none" && (
+                      <TouchableOpacity
+                        style={[
+                          styles.playButton,
+                          {
+                            backgroundColor: isThisSoundPreviewing
                               ? colors.text
                               : colors.surface,
-                        },
-                      ]}
-                      onPress={handleAmbientPreview}
-                    >
-                      {isAmbientPlaying &&
-                      settings.ambientSound === sound.value ? (
-                        <StopIcon color={colors.background} />
-                      ) : (
-                        <PlayIcon color={colors.textSecondary} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
+                          },
+                        ]}
+                        onPress={() => handlePreviewAmbient(sound.value)}
+                      >
+                        {isThisSoundPreviewing ? (
+                          <StopIcon color={colors.background} />
+                        ) : (
+                          <PlayIcon color={colors.textSecondary} />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </React.Fragment>
+            );
+          })}
 
           {/* Volume */}
           {settings.ambientSound !== "none" && (
