@@ -8,6 +8,7 @@ import {
   TextInput,
   Animated,
   PanResponder,
+  Alert,
 } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import {
@@ -15,6 +16,7 @@ import {
   AlarmSound,
   AmbientSound,
 } from "../context/SettingsContext";
+import { useInsights } from "../context/InsightsContext";
 import { typography } from "../theme/typography";
 
 // Icons with theme support
@@ -274,12 +276,32 @@ export function SettingsScreen() {
     isAmbientPlaying,
   } = useSettings();
 
+  const { clearAllData, sessions } = useInsights();
+
   const handleAmbientPreview = async () => {
     if (isAmbientPlaying) {
       await stopAmbientSound();
     } else {
       await playAmbientSound();
     }
+  };
+
+  const handleClearInsightsData = () => {
+    Alert.alert(
+      "Clear Insights Data",
+      "This will permanently delete all your focus sessions, streaks, and statistics. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: async () => {
+            await clearAllData();
+            Alert.alert("Done", "All insights data has been cleared.");
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -531,6 +553,34 @@ export function SettingsScreen() {
         </View>
       </View>
 
+      {/* Data Management */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+          DATA
+        </Text>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.dataRow}
+            onPress={handleClearInsightsData}
+          >
+            <View>
+              <Text style={[styles.dataLabel, { color: colors.text }]}>
+                Clear Insights Data
+              </Text>
+              <Text style={[styles.dataSubtitle, { color: colors.textMuted }]}>
+                {sessions.length} sessions recorded
+              </Text>
+            </View>
+            <Text style={[styles.dataAction, { color: "#FF3B30" }]}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* App Info */}
       <View style={styles.appInfo}>
         <Text style={[styles.appName, { color: colors.textMuted }]}>
@@ -778,6 +828,23 @@ const styles = StyleSheet.create({
     position: "absolute",
     borderRadius: 14,
     borderWidth: 1,
+  },
+  dataRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+  },
+  dataLabel: {
+    ...typography.callout,
+  },
+  dataSubtitle: {
+    ...typography.caption1,
+    marginTop: 2,
+  },
+  dataAction: {
+    ...typography.callout,
+    fontWeight: "600",
   },
   appInfo: {
     alignItems: "center",

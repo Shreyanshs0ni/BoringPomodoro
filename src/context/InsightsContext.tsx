@@ -42,6 +42,7 @@ interface InsightsContextType {
   // Actions
   addSession: (session: Omit<FocusSession, "id" | "completedAt">) => void;
   getHeatmapData: (weeks: number) => { date: string; count: number }[];
+  clearAllData: () => Promise<void>;
   
   // Selected category for new sessions
   selectedCategory: FocusCategory;
@@ -187,6 +188,18 @@ export function InsightsProvider({ children }: InsightsProviderProps) {
     []
   );
 
+  const clearAllData = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(SESSIONS_STORAGE_KEY);
+      await AsyncStorage.removeItem(STREAKS_STORAGE_KEY);
+      setSessions([]);
+      setCurrentStreak(0);
+      setBestStreak(0);
+    } catch (error) {
+      console.error("Error clearing insights data:", error);
+    }
+  }, []);
+
   // Calculate daily stats
   const dailyStats = new Map<string, DailyStats>();
   sessions.forEach((session) => {
@@ -249,6 +262,7 @@ export function InsightsProvider({ children }: InsightsProviderProps) {
         categoryStats,
         addSession,
         getHeatmapData,
+        clearAllData,
         selectedCategory,
         setSelectedCategory,
       }}

@@ -1,9 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native";
 import Svg, { Rect, Text as SvgText, G, Path } from "react-native-svg";
 import { useInsights, FocusCategory } from "../context/InsightsContext";
 import { useSettings } from "../context/SettingsContext";
 import { typography } from "../theme/typography";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 const CATEGORY_LABELS: Record<FocusCategory, string> = {
   work: "Work",
@@ -104,14 +106,20 @@ export function InsightsScreen() {
     );
   };
 
-  // Heatmap rendering
-  const cellSize = 12;
-  const cellGap = 3;
+  // Heatmap rendering - calculate dimensions based on available width
+  const heatmapContainerPadding = 48; // 24px margin on each side
+  const dayLabelWidth = 28; // Space for day labels on the left
+  const availableWidth = SCREEN_WIDTH - heatmapContainerPadding - dayLabelWidth - 40; // padding inside card
+  
   const weeksToShow = Math.ceil(heatmapData.length / 7);
-  const heatmapWidth = weeksToShow * (cellSize + cellGap) + 40;
-  const heatmapHeight = 7 * (cellSize + cellGap) + 30;
+  const cellGap = 3;
+  const cellSize = Math.floor((availableWidth - (weeksToShow - 1) * cellGap) / weeksToShow);
+  const actualCellSize = Math.max(Math.min(cellSize, 18), 10); // Clamp between 10 and 18
+  
+  const heatmapWidth = weeksToShow * (actualCellSize + cellGap) + dayLabelWidth + 10;
+  const heatmapHeight = 7 * (actualCellSize + cellGap) + 24;
 
-  const days = ["S", "M", "T", "W", "T", "F", "S"];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const months: { label: string; x: number }[] = [];
   let currentMonth = "";
   heatmapData.forEach((item, index) => {
@@ -119,7 +127,7 @@ export function InsightsScreen() {
     const week = Math.floor(index / 7);
     if (month !== currentMonth) {
       currentMonth = month;
-      months.push({ label: month, x: week * (cellSize + cellGap) + 40 });
+      months.push({ label: month, x: week * (actualCellSize + cellGap) + dayLabelWidth });
     }
   });
 
@@ -166,10 +174,17 @@ export function InsightsScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Focus Activity</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <Svg width={heatmapWidth} height={heatmapHeight}>
-            {/* Day labels */}
-            {[1, 3, 5].map((dayIndex) => (
-              <SvgText key={dayIndex} x={15} y={dayIndex * (cellSize + cellGap) + cellSize + 20} fontSize={9} fill={colors.textMuted} textAnchor="middle">
-                {days[dayIndex]}
+            {/* Day labels - show all 7 days */}
+            {days.map((dayLabel, dayIndex) => (
+              <SvgText 
+                key={dayIndex} 
+                x={dayLabelWidth / 2} 
+                y={dayIndex * (actualCellSize + cellGap) + actualCellSize / 2 + 20 + 3} 
+                fontSize={8} 
+                fill={colors.textMuted} 
+                textAnchor="middle"
+              >
+                {dayLabel.charAt(0)}
               </SvgText>
             ))}
 
@@ -184,16 +199,16 @@ export function InsightsScreen() {
             {heatmapData.map((item, index) => {
               const week = Math.floor(index / 7);
               const day = index % 7;
-              const x = week * (cellSize + cellGap) + 40;
-              const y = day * (cellSize + cellGap) + 20;
+              const x = week * (actualCellSize + cellGap) + dayLabelWidth;
+              const y = day * (actualCellSize + cellGap) + 20;
               return (
                 <G key={item.date}>
                   {/* Cell background with border */}
                   <Rect
                     x={x}
                     y={y}
-                    width={cellSize}
-                    height={cellSize}
+                    width={actualCellSize}
+                    height={actualCellSize}
                     rx={2}
                     fill={getHeatmapColor(item.count)}
                     stroke={colors.border}
