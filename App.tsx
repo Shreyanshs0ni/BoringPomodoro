@@ -1,16 +1,14 @@
 import React, { useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { View, TouchableOpacity, Text, Modal, StyleSheet } from "react-native";
+import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { PomodoroProvider } from "./src/context/PomodoroContext";
 import { TaskProvider } from "./src/context/TaskContext";
 import { InsightsProvider } from "./src/context/InsightsContext";
 import { SettingsProvider, useSettings } from "./src/context/SettingsContext";
-import { PremiumProvider } from "./src/context/PremiumContext";
 import { FocusScreen } from "./src/screens/FocusScreen";
 import { TaskManagerScreen } from "./src/screens/TaskManagerScreen";
 import { InsightsScreen } from "./src/screens/InsightsScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
-import { PaywallScreen } from "./src/screens/PaywallScreen";
 import { typography } from "./src/theme/typography";
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 
@@ -139,7 +137,6 @@ function SettingsIcon({
 // Main app content with theme support
 function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("focus");
-  const [showPaywall, setShowPaywall] = useState(false);
   const { colors, isDark } = useSettings();
 
   const renderScreen = () => {
@@ -153,7 +150,7 @@ function AppContent() {
       case "insights":
         return <InsightsScreen />;
       case "settings":
-        return <SettingsScreen onShowPaywall={() => setShowPaywall(true)} />;
+        return <SettingsScreen />;
       default:
         return (
           <FocusScreen onNavigateToTasks={() => setCurrentScreen("tasks")} />
@@ -265,16 +262,6 @@ function AppContent() {
         </TouchableOpacity>
       </View>
 
-      {/* Paywall Modal */}
-      <Modal
-        visible={showPaywall}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setShowPaywall(false)}
-      >
-        <PaywallScreen onClose={() => setShowPaywall(false)} />
-      </Modal>
-
       <StatusBar style={isDark ? "light" : "dark"} />
     </View>
   );
@@ -282,17 +269,15 @@ function AppContent() {
 
 export default function App() {
   return (
-    <PremiumProvider>
-      <SettingsProvider>
-        <InsightsProvider>
-          <TaskProvider>
-            <PomodoroProvider>
-              <AppContent />
-            </PomodoroProvider>
-          </TaskProvider>
-        </InsightsProvider>
-      </SettingsProvider>
-    </PremiumProvider>
+    <SettingsProvider>
+      <InsightsProvider>
+        <TaskProvider>
+          <PomodoroProvider>
+            <AppContent />
+          </PomodoroProvider>
+        </TaskProvider>
+      </InsightsProvider>
+    </SettingsProvider>
   );
 }
 

@@ -16,5 +16,3 @@ export type {
   TimerSettings,
   AppSettings,
 } from "./SettingsContext";
-
-export { PremiumProvider, usePremium, FREE_TIER_LIMITS, PREMIUM_FEATURES } from "./PremiumContext";

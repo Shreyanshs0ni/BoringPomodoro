@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Animated,
   PanResponder,
 } from "react-native";
@@ -16,7 +15,6 @@ import {
   AlarmSound,
   AmbientSound,
 } from "../context/SettingsContext";
-import { usePremium } from "../context/PremiumContext";
 import { typography } from "../theme/typography";
 
 // Icons with theme support
@@ -32,28 +30,6 @@ function StopIcon({ color }: { color: string }) {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
       <Rect x="6" y="6" width="12" height="12" rx="2" fill={color} />
-    </Svg>
-  );
-}
-
-function LockIcon({ color }: { color: string }) {
-  return (
-    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-      <Rect
-        x="3"
-        y="11"
-        width="18"
-        height="11"
-        rx="2"
-        stroke={color}
-        strokeWidth={2}
-      />
-      <Path
-        d="M7 11V7a5 5 0 0110 0v4"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
     </Svg>
   );
 }
@@ -273,24 +249,16 @@ const ALARM_SOUNDS: { value: AlarmSound; label: string }[] = [
   { value: "gentle", label: "Gentle" },
 ];
 
-const AMBIENT_SOUNDS: {
-  value: AmbientSound;
-  label: string;
-  premium: boolean;
-}[] = [
-  { value: "none", label: "None", premium: false },
-  { value: "rain", label: "Rain", premium: false },
-  { value: "forest", label: "Forest", premium: false },
-  { value: "cafe", label: "Coffee Shop", premium: true },
-  { value: "ocean", label: "Ocean Waves", premium: true },
-  { value: "fireplace", label: "Fireplace", premium: true },
+const AMBIENT_SOUNDS: { value: AmbientSound; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "rain", label: "Rain" },
+  { value: "forest", label: "Forest" },
+  { value: "cafe", label: "Coffee Shop" },
+  { value: "ocean", label: "Ocean Waves" },
+  { value: "fireplace", label: "Fireplace" },
 ];
 
-interface SettingsScreenProps {
-  onShowPaywall?: () => void;
-}
-
-export function SettingsScreen({ onShowPaywall }: SettingsScreenProps) {
+export function SettingsScreen() {
   const {
     settings,
     colors,
@@ -305,15 +273,6 @@ export function SettingsScreen({ onShowPaywall }: SettingsScreenProps) {
     previewAlarmSound,
     isAmbientPlaying,
   } = useSettings();
-  const { isPremium, canUseAmbientSound, toggleMockPremium } = usePremium();
-
-  const handleUpgradeToPremium = () => {
-    if (isPremium) {
-      Alert.alert("Premium Active", "You already have premium access!");
-    } else if (onShowPaywall) {
-      onShowPaywall();
-    }
-  };
 
   const handleAmbientPreview = async () => {
     if (isAmbientPlaying) {
@@ -321,10 +280,6 @@ export function SettingsScreen({ onShowPaywall }: SettingsScreenProps) {
     } else {
       await playAmbientSound();
     }
-  };
-
-  const handleDevToggle = async () => {
-    await toggleMockPremium();
   };
 
   return (
@@ -490,74 +445,63 @@ export function SettingsScreen({ onShowPaywall }: SettingsScreenProps) {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {AMBIENT_SOUNDS.map((sound, index) => {
-            const isLocked = sound.premium && !canUseAmbientSound(sound.value);
-            return (
-              <React.Fragment key={sound.value}>
-                {index > 0 && (
-                  <View
-                    style={[styles.divider, { backgroundColor: colors.border }]}
-                  />
-                )}
-                <TouchableOpacity
-                  style={[styles.soundRow, isLocked && styles.lockedRow]}
-                  onPress={() => {
-                    if (isLocked) {
-                      handleUpgradeToPremium();
-                    } else {
-                      setAmbientSound(sound.value);
-                      if (isAmbientPlaying) stopAmbientSound();
-                    }
-                  }}
+          {AMBIENT_SOUNDS.map((sound, index) => (
+            <React.Fragment key={sound.value}>
+              {index > 0 && (
+                <View
+                  style={[styles.divider, { backgroundColor: colors.border }]}
+                />
+              )}
+              <TouchableOpacity
+                style={styles.soundRow}
+                onPress={() => {
+                  setAmbientSound(sound.value);
+                  if (isAmbientPlaying) stopAmbientSound();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.soundLabel,
+                    {
+                      color:
+                        settings.ambientSound === sound.value
+                          ? colors.text
+                          : colors.textSecondary,
+                    },
+                  ]}
                 >
-                  <View style={styles.soundLabelRow}>
-                    <Text
+                  {sound.label}
+                </Text>
+                <View style={styles.soundActions}>
+                  {settings.ambientSound === sound.value && (
+                    <CheckIcon color={colors.text} />
+                  )}
+                  {sound.value !== "none" && (
+                    <TouchableOpacity
                       style={[
-                        styles.soundLabel,
+                        styles.playButton,
                         {
-                          color:
+                          backgroundColor:
+                            isAmbientPlaying &&
                             settings.ambientSound === sound.value
                               ? colors.text
-                              : colors.textSecondary,
+                              : colors.surface,
                         },
-                        isLocked && { color: colors.textMuted },
                       ]}
+                      onPress={handleAmbientPreview}
                     >
-                      {sound.label}
-                    </Text>
-                    {isLocked && <LockIcon color={colors.textMuted} />}
-                  </View>
-                  <View style={styles.soundActions}>
-                    {settings.ambientSound === sound.value && !isLocked && (
-                      <CheckIcon color={colors.text} />
-                    )}
-                    {sound.value !== "none" && !isLocked && (
-                      <TouchableOpacity
-                        style={[
-                          styles.playButton,
-                          {
-                            backgroundColor:
-                              isAmbientPlaying &&
-                              settings.ambientSound === sound.value
-                                ? colors.text
-                                : colors.surface,
-                          },
-                        ]}
-                        onPress={handleAmbientPreview}
-                      >
-                        {isAmbientPlaying &&
-                        settings.ambientSound === sound.value ? (
-                          <StopIcon color={colors.background} />
-                        ) : (
-                          <PlayIcon color={colors.textSecondary} />
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              </React.Fragment>
-            );
-          })}
+                      {isAmbientPlaying &&
+                      settings.ambientSound === sound.value ? (
+                        <StopIcon color={colors.background} />
+                      ) : (
+                        <PlayIcon color={colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
 
           {/* Volume */}
           {settings.ambientSound !== "none" && (
@@ -584,69 +528,6 @@ export function SettingsScreen({ onShowPaywall }: SettingsScreenProps) {
               </View>
             </>
           )}
-        </View>
-      </View>
-
-      {/* Premium */}
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={[
-            styles.premiumCard,
-            { backgroundColor: colors.card, borderColor: colors.text },
-          ]}
-          onPress={handleUpgradeToPremium}
-        >
-          <View style={styles.premiumContent}>
-            <Text style={[styles.premiumTitle, { color: colors.text }]}>
-              {isPremium ? "Premium Active" : "Upgrade to Premium"}
-            </Text>
-            <Text
-              style={[styles.premiumSubtitle, { color: colors.textSecondary }]}
-            >
-              {isPremium
-                ? "Thank you for your support"
-                : "Unlock all sounds, cloud sync & more"}
-            </Text>
-          </View>
-          {!isPremium && (
-            <Text style={[styles.premiumPrice, { color: colors.text }]}>
-              $4.99/mo
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Developer Options */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-          DEVELOPER
-        </Text>
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-        >
-          <TouchableOpacity style={styles.devRow} onPress={handleDevToggle}>
-            <Text style={[styles.devLabel, { color: colors.text }]}>
-              Toggle Mock Premium
-            </Text>
-            <View
-              style={[
-                styles.devBadge,
-                { backgroundColor: isPremium ? colors.text : colors.border },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.devBadgeText,
-                  { color: isPremium ? colors.background : colors.textMuted },
-                ]}
-              >
-                {isPremium ? "ON" : "OFF"}
-              </Text>
-            </View>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -850,14 +731,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 16,
   },
-  lockedRow: {
-    opacity: 0.5,
-  },
-  soundLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   soundLabel: {
     ...typography.callout,
   },
@@ -905,46 +778,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     borderRadius: 14,
     borderWidth: 1,
-  },
-  premiumCard: {
-    marginHorizontal: 24,
-    borderRadius: 12,
-    padding: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  premiumContent: {
-    flex: 1,
-  },
-  premiumTitle: {
-    ...typography.headline,
-  },
-  premiumSubtitle: {
-    ...typography.footnote,
-    marginTop: 4,
-  },
-  premiumPrice: {
-    ...typography.callout,
-    fontWeight: "700",
-  },
-  devRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  devLabel: {
-    ...typography.callout,
-  },
-  devBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  devBadgeText: {
-    ...typography.caption2,
-    fontWeight: "700",
   },
   appInfo: {
     alignItems: "center",

@@ -87,6 +87,7 @@ export function PomodoroProvider({ children }: PomodoroProviderProps) {
   const notificationIdRef = useRef<string | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const appStateRef = useRef(AppState.currentState);
+  const userWantsAmbientRef = useRef(false); // Track if user explicitly enabled ambient sound
 
   // Get duration based on mode and settings
   const getDuration = useCallback(
@@ -330,8 +331,12 @@ export function PomodoroProvider({ children }: PomodoroProviderProps) {
   const startTimer = useCallback(async () => {
     startTimerInternal();
 
-    // Start ambient sound if configured
-    if (mode === "focus" && settings.ambientSound !== "none") {
+    // Resume ambient sound only if user had explicitly enabled it
+    if (
+      userWantsAmbientRef.current &&
+      mode === "focus" &&
+      settings.ambientSound !== "none"
+    ) {
       const success = await audioService.playAmbientSound(
         settings.ambientSound,
         settings.ambientVolume
@@ -375,7 +380,8 @@ export function PomodoroProvider({ children }: PomodoroProviderProps) {
     setTimerKey((prev) => prev + 1);
     startTimeRef.current = null;
 
-    // Stop ambient sound
+    // Stop ambient sound and reset user preference
+    userWantsAmbientRef.current = false;
     await audioService.stopAmbientSound();
     setIsAmbientPlaying(false);
 
@@ -398,6 +404,7 @@ export function PomodoroProvider({ children }: PomodoroProviderProps) {
     setTimerKey((prev) => prev + 1);
     startTimeRef.current = null;
 
+    userWantsAmbientRef.current = false; // Reset user's ambient preference
     await audioService.stopAmbientSound();
     setIsAmbientPlaying(false);
 
@@ -411,6 +418,7 @@ export function PomodoroProvider({ children }: PomodoroProviderProps) {
 
   const startAmbientSound = useCallback(async () => {
     if (settings.ambientSound !== "none") {
+      userWantsAmbientRef.current = true; // User explicitly enabled ambient sound
       const success = await audioService.playAmbientSound(
         settings.ambientSound,
         settings.ambientVolume
@@ -420,6 +428,7 @@ export function PomodoroProvider({ children }: PomodoroProviderProps) {
   }, [settings.ambientSound, settings.ambientVolume]);
 
   const stopAmbientSound = useCallback(async () => {
+    userWantsAmbientRef.current = false; // User explicitly disabled ambient sound
     await audioService.stopAmbientSound();
     setIsAmbientPlaying(false);
   }, []);
